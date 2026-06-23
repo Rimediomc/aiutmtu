@@ -6,12 +6,11 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
 
 # =========================================================================
-# INSERISCI I TUOI DATI REALI QUI SOTTO
+# DATI REALI INSERITI
 # =========================================================================
 TOKEN = "8662944209:AAGZ2vRusJcV4TO2yCfU-hSjVZ6vdpVGTX4"
-SUPER_ADMIN_ID = 670198268     # <--- Metti qui il TUO ID personale (numero)
+SUPER_ADMIN_ID = 670198268
 
-# Inserisci qui dentro gli username fissi dei tuoi amici (senza la @, tutto in minuscolo)
 ADMINS_FISSI = {"paolorimedio", "sclerobotomia"}
 # =========================================================================
 
@@ -24,7 +23,6 @@ def controlla_utente(update: Update) -> bool:
     user_id = user.id
     return (user_id == SUPER_ADMIN_ID or username in ADMINS_FISSI or username in ADMINS_TEMPORANEI or str(user_id) in ADMINS_TEMPORANEI)
 
-# Comandi amministratore
 async def aggiungi_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != SUPER_ADMIN_ID: return
     if not context.args:
@@ -49,7 +47,7 @@ async def rimuovi_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def mostra_lista(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != SUPER_ADMIN_ID: return
     testo = f"👑 **Super Admin ID**: {SUPER_ADMIN_ID}\n\n👥 **Admin Fissi**:\n"
-    for adm in ADMINS_FISSI: testo += f"• @{adm}\n" if "metti_username" not in adm else "• Nessuno\n"
+    for adm in ADMINS_FISSI: testo += f"• @{adm}\n"
     testo += "\n➕ **Admin Aggiunti via chat**:\n"
     if not ADMINS_TEMPORANEI: testo += "• Nessuno al momento\n"
     for adm in ADMINS_TEMPORANEI: testo += f"• @{adm}\n"
@@ -108,35 +106,22 @@ async def imposta_modalita(update: Update, context: ContextTypes.DEFAULT_TYPE):
     stato = USER_DATA[user_id]
     scelta = update.message.text
 
-    if scelta == "📁 Cambia Nome File + Didascalia":
-        stato['mode'] = "file"
-    elif scelta == "🎬 Solo Didascalia Video":
-        stato['mode'] = "video"
-    else:
-        return
+    if scelta == "📁 Cambia Nome File + Didascalia": stato['mode'] = "file"
+    elif scelta == "🎬 Solo Didascalia Video": stato['mode'] = "video"
+    else: return
 
     stato['waiting_for_title'] = True
-    await update.message.reply_text(
-        f"Perfetto. Scrivimi adesso il titolo base che vuoi dare (es: antonio 1x):",
-        reply_markup=ReplyKeyboardRemove()
-    )
+    await update.message.reply_text("Perfetto. Scrivimi adesso il titolo base che vuoi dare (es: antonio 1x):", reply_markup=ReplyKeyboardRemove())
 
 async def esegui_rinomina(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not controlla_utente(update): return
     user_id = update.effective_user.id
     stato = USER_DATA[user_id]
     
-    if update.message.text == "❌ Svuota la coda":
-        await svuota_coda(update, context)
-        return
-    if update.message.text == "🏷️ Rinomina i file":
-        await scegli_modalita(update, context)
-        return
-    if update.message.text in ["📁 Cambia Nome File + Didascalia", "🎬 Solo Didascalia Video"]:
-        await imposta_modalita(update, context)
-        return
-    if not stato['waiting_for_title']:
-        return
+    if update.message.text == "❌ Svuota la coda": await svuota_coda(update, context); return
+    if update.message.text == "🏷️ Rinomina i file": await scegli_modalita(update, context); return
+    if update.message.text in ["📁 Cambia Nome File + Didascalia", "🎬 Solo Didascalia Video"]: await imposta_modalita(update, context); return
+    if not stato['waiting_for_title']: return
         
     titolo_base = update.message.text
     stato['waiting_for_title'] = False
@@ -151,36 +136,16 @@ async def esegui_rinomina(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for posizione, file_id in enumerate(lista_file, start=1):
         numero = str(posizione).zfill(2)
         nome_file_interno = f"{titolo_base}{numero}.mp4"
-        didascalia_pulita = f"{titolo_base}{numero}" # Senza .mp4 nella scritta sotto
+        didascalia_pulita = f"{titolo_base}{numero}"
         
         try:
             if modalita == "file":
-                # Invia come riga grigia (documento)
-                await context.bot.send_document(
-                    chat_id=user_id,
-                    document=file_id,
-                    filename=nome_file_interno,
-                    caption=didascalia_pulita
-                )
+                await context.bot.send_document(chat_id=user_id, document=file_id, filename=nome_file_interno, caption=didascalia_pulita)
             else:
-                # Invia come quadrato nero col tasto PLAY (video)
-                await context.bot.send_video(
-                    chat_id=user_id,
-                    video=file_id,
-                    filename=nome_file_interno, # Questo cambia il nome del file fisico dentro al video!
-                    caption=didascalia_pulita,
-                    supports_streaming=True
-                )
+                await context.bot.send_video(chat_id=user_id, video=file_id, filename=nome_file_interno, caption=didascalia_pulita, supports_streaming=True)
         except Exception as errore:
-            # Se rileva un errore con send_video (ad esempio se il file di partenza non era un mp4 valido),
-            # lo manda come documento grigio per non perdere il file
             try:
-                await context.bot.send_document(
-                    chat_id=user_id,
-                    document=file_id,
-                    filename=nome_file_interno,
-                    caption=didascalia_pulita
-                )
+                await context.bot.send_document(chat_id=user_id, document=file_id, filename=nome_file_interno, caption=didascalia_pulita)
             except Exception:
                 await update.message.reply_text(f"Errore sull'elemento {posizione}: {str(errore)}")
 
