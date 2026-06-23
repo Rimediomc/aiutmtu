@@ -10,11 +10,11 @@ logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=lo
 # =========================================================================
 TOKEN = "8662944209:AAGZ2vRusJcV4TO2yCfU-hSjVZ6vdpVGTX4"
 SUPER_ADMIN_ID = 670198268     # <--- Metti qui il TUO ID personale (numero)
-# =========================================================================
 
 # Inserisci qui dentro gli username fissi dei tuoi amici (senza la @, tutto in minuscolo)
 # Esempio: ADMINS_FISSI = {"antonio_99", "luca_rossi"}
 ADMINS_FISSI = {"paolorimedio", "sclerobotomia"}
+# =========================================================================
 
 # Lista per gli admin aggiunti temporaneamente via chat
 ADMINS_TEMPORANEI = set()
@@ -33,16 +33,17 @@ def controlla_utente(update: Update) -> bool:
             str(user_id) in ADMINS_TEMPORANEI)
 
 # -------------------------------------------------------------------------
-# COMANDI DI GESTIONE PER IL SUPER ADMIN
+# COMANDI DI GESTIONE PER IL SUPER ADMIN (CORRETTI SENZA BLOCCO NUMERI)
 # -------------------------------------------------------------------------
 async def aggiungi_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != SUPER_ADMIN_ID:
         return
     if not context.args:
-        await update.message.reply_text("Uso corretto: `/aggiungi username_o_id`", parse_mode="Markdown")
+        await update.message.reply_text("Uso corretto: `/aggiungi @username` o ID", parse_mode="Markdown")
         return
     
-    nuovo_admin = context.args[0].replace("@", "").lower()
+    # Prende l'input, toglie la @, pulisce gli spazi e mette in minuscolo
+    nuovo_admin = " ".join(context.args).replace("@", "").strip().lower()
     ADMINS_TEMPORANEI.add(nuovo_admin)
     await update.message.reply_text(f"✅ L'utente `{nuovo_admin}` è stato aggiunto agli Admin!", parse_mode="Markdown")
 
@@ -50,10 +51,10 @@ async def rimuovi_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != SUPER_ADMIN_ID:
         return
     if not context.args:
-        await update.message.reply_text("Uso corretto: `/rimuovi username_o_id`", parse_mode="Markdown")
+        await update.message.reply_text("Uso corretto: `/rimuovi @username` o ID", parse_mode="Markdown")
         return
     
-    admin_da_togliere = context.args[0].replace("@", "").lower()
+    admin_da_togliere = " ".join(context.args).replace("@", "").strip().lower()
     if admin_da_togliere in ADMINS_TEMPORANEI:
         ADMINS_TEMPORANEI.remove(admin_da_togliere)
         await update.message.reply_text(f"✅ L'utente `{admin_da_togliere}` è stato rimosso dagli Admin.", parse_mode="Markdown")
@@ -64,18 +65,25 @@ async def mostra_lista(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != SUPER_ADMIN_ID:
         return
     testo = f"👑 **Super Admin ID**: {SUPER_ADMIN_ID}\n\n"
-    testo += "👥 **Admin Fisso (nel codice)**:\n"
-    for adm in ADMINS_FISSI:
-        testo += f"• @{adm}\n"
+    
+    testo += "👥 **Admin Fissi (nel codice)**:\n"
+    if not ADMINS_FISSI or "metti_username_amico_1" in ADMINS_FISSI:
+        testo += "• Nessuno\n"
+    else:
+        for adm in ADMINS_FISSI:
+            testo += f"• @{adm}\n"
+            
     testo += "\n➕ **Admin Aggiunti via chat**:\n"
     if not ADMINS_TEMPORANEI:
         testo += "• Nessuno al momento\n"
-    for adm in ADMINS_TEMPORANEI:
-        testo += f"• @{adm} (o ID)\n"
+    else:
+        for adm in ADMINS_TEMPORANEI:
+            testo += f"• @{adm}\n"
+            
     await update.message.reply_text(testo, parse_mode="Markdown")
 
 # -------------------------------------------------------------------------
-# FUNZIONI PRINCIPALI DEL BOT (CODE E BOTTONI)
+# FUNZIONI PRINCIPALES DEL BOT (CODE E BOTTONI)
 # -------------------------------------------------------------------------
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not controlla_utente(update): return
