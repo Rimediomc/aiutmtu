@@ -9,64 +9,69 @@ logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=lo
 # INSERISCI I TUOI DATI REALI QUI SOTTO
 # =========================================================================
 TOKEN = "8662944209:AAGZ2vRusJcV4TO2yCfU-hSjVZ6vdpVGTX4"
-SUPER_ADMIN = 670198268       # <--- Metti qui il TUO ID personale
+SUPER_ADMIN_ID = 670198268     # <--- Metti qui il TUO ID personale (numero)
 # =========================================================================
 
-# Lista iniziale degli admin (puoi lasciarla vuota o mettere gli ID di partenza)
-# Il Super Admin viene aggiunto automaticamente dal codice più in basso
-ADMINS_CORRENTI = set() 
+# Inserisci qui dentro gli username fissi dei tuoi amici (senza la @, tutto in minuscolo)
+# Esempio: ADMINS_FISSI = {"antonio_99", "luca_rossi"}
+ADMINS_FISSI = {"paolorimedio", "sclerobotomia"}
+
+# Lista per gli admin aggiunti temporaneamente via chat
+ADMINS_TEMPORANEI = set()
 
 USER_DATA = defaultdict(lambda: {'queue': [], 'waiting_for_title': False})
 
 def controlla_utente(update: Update) -> bool:
-    """Controlla se l'utente è il Super Admin o un Admin autorizzato"""
-    user_id = update.effective_user.id
-    return user_id == SUPER_ADMIN or user_id in ADMINS_CORRENTI
+    """Controlla se l'utente è autorizzato tramite ID o Username"""
+    user = update.effective_user
+    username = user.username.lower() if user.username else ""
+    user_id = user.id
+    
+    return (user_id == SUPER_ADMIN_ID or 
+            username in ADMINS_FISSI or 
+            username in ADMINS_TEMPORANEI or 
+            str(user_id) in ADMINS_TEMPORANEI)
 
 # -------------------------------------------------------------------------
 # COMANDI DI GESTIONE PER IL SUPER ADMIN
 # -------------------------------------------------------------------------
 async def aggiungi_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Permette al Super Admin di aggiungere un admin tramite chat"""
-    if update.effective_user.id != SUPER_ADMIN:
+    if update.effective_user.id != SUPER_ADMIN_ID:
         return
     if not context.args:
-        await update.message.reply_text("Uso corretto: `/aggiungi ID_NUMERICO`", parse_mode="Markdown")
+        await update.message.reply_text("Uso corretto: `/aggiungi username_o_id`", parse_mode="Markdown")
         return
-    try:
-        nuovo_id = int(context.args[0])
-        ADMINS_CORRENTI.add(nuovo_id)
-        await update.message.reply_text(f"✅ Utente {nuovo_id} aggiunto alla lista degli Admin!")
-    except ValueError:
-        await update.message.reply_text("❌ L'ID deve essere composto solo da numeri.")
+    
+    nuovo_admin = context.args[0].replace("@", "").lower()
+    ADMINS_TEMPORANEI.add(nuovo_admin)
+    await update.message.reply_text(f"✅ L'utente `{nuovo_admin}` è stato aggiunto agli Admin!", parse_mode="Markdown")
 
 async def rimuovi_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Permette al Super Admin di rimuovere un admin tramite chat"""
-    if update.effective_user.id != SUPER_ADMIN:
+    if update.effective_user.id != SUPER_ADMIN_ID:
         return
     if not context.args:
-        await update.message.reply_text("Uso corretto: `/rimuovi ID_NUMERICO`", parse_mode="Markdown")
+        await update.message.reply_text("Uso corretto: `/rimuovi username_o_id`", parse_mode="Markdown")
         return
-    try:
-        id_da_togliere = int(context.args[0])
-        if id_da_togliere in ADMINS_CORRENTI:
-            ADMINS_CORRENTI.remove(id_da_togliere)
-            await update.message.reply_text(f"✅ Utente {id_da_togliere} rimosso dagli Admin.")
-        else:
-            await update.message.reply_text("❌ Questo ID non era presente nella lista.")
-    except ValueError:
-        await update.message.reply_text("❌ L'ID deve essere composto solo da numeri.")
+    
+    admin_da_togliere = context.args[0].replace("@", "").lower()
+    if admin_da_togliere in ADMINS_TEMPORANEI:
+        ADMINS_TEMPORANEI.remove(admin_da_togliere)
+        await update.message.reply_text(f"✅ L'utente `{admin_da_togliere}` è stato rimosso dagli Admin.", parse_mode="Markdown")
+    else:
+        await update.message.reply_text("❌ Questo utente non era presente nella lista temporanea (o è fisso nel codice).")
 
 async def mostra_lista(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Mostra la lista attuale degli admin al Super Admin"""
-    if update.effective_user.id != SUPER_ADMIN:
+    if update.effective_user.id != SUPER_ADMIN_ID:
         return
-    if not ADMINS_CORRENTI:
-        await update.message.reply_text(f"👑 Tu sei il Super Admin ({SUPER_ADMIN}). Non ci sono altri admin associati al momento.")
-        return
-    testo = f"👑 **Super Admin**: {SUPER_ADMIN}\n\n👥 **Admin abilitati**:\n"
-    for adm in ADMINS_CORRENTI:
-        testo += f"• {adm}\n"
+    testo = f"👑 **Super Admin ID**: {SUPER_ADMIN_ID}\n\n"
+    testo += "👥 **Admin Fisso (nel codice)**:\n"
+    for adm in ADMINS_FISSI:
+        testo += f"• @{adm}\n"
+    testo += "\n➕ **Admin Aggiunti via chat**:\n"
+    if not ADMINS_TEMPORANEI:
+        testo += "• Nessuno al momento\n"
+    for adm in ADMINS_TEMPORANEI:
+        testo += f"• @{adm} (o ID)\n"
     await update.message.reply_text(testo, parse_mode="Markdown")
 
 # -------------------------------------------------------------------------
@@ -77,9 +82,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     USER_DATA[user_id] = {'queue': [], 'waiting_for_title': False}
     
-    messaggio = "Ciao! Inviami pure i video o i file in serie.\nQuando hai finito, usa i bottoni in basso per procedere."
-    if user_id == SUPER_ADMIN:
-        messaggio += "\n\n⚙️ **Comandi Creatore**:\n`/aggiungi ID`\n`/rimuovi ID`\n`/lista`"
+    messaggio = "Ciao! Sei un utente autorizzato.\nInviami pure i video o i file in serie.\nQuando hai finito, usa i bottoni in basso per procedere."
+    if user_id == SUPER_ADMIN_ID:
+        messaggio += "\n\n⚙️ **Comandi Creatore**:\n`/aggiungi @username` o ID\n`/rimuovi @username` o ID\n`/lista`"
         
     await update.message.reply_text(messaggio, parse_mode="Markdown", reply_markup=ReplyKeyboardRemove())
 
@@ -100,7 +105,6 @@ async def ricevi_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     stato['queue'].append(file_id)
     quanti = len(stato['queue'])
     
-    # Crea la tastiera con i due bottoni cliccabili grandi sotto la chat
     tastiera = ReplyKeyboardMarkup(
         [[KeyboardButton("🏷️ Rinomina i file"), KeyboardButton("❌ Svuota la coda")]],
         resize_keyboard=True,
@@ -110,7 +114,6 @@ async def ricevi_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"📥 Ricevuto! Elementi in coda: {quanti}", reply_markup=tastiera)
 
 async def svuota_coda(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Cancella tutti gli elementi accumulati fino ad ora"""
     if not controlla_utente(update): return
     user_id = update.effective_user.id
     USER_DATA[user_id]['queue'] = []
@@ -128,7 +131,7 @@ async def chiedi_titolo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
     stato['waiting_for_title'] = True
     await update.message.reply_text(
-        f"Ci sono {len(stato['queue'])} video pronti.\nScrivimi adesso il titolo base (es: antonio 1x):",
+        f"Ci sono {len(stato['queue'])} video pronti nella TUA coda.\nScrivimi adesso il titolo base (es: antonio 1x):",
         reply_markup=ReplyKeyboardRemove()
     )
 
@@ -137,17 +140,14 @@ async def esegui_rinomina(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     stato = USER_DATA[user_id]
     
-    # Se clicca sul bottone per svuotare la coda
     if update.message.text == "❌ Svuota la coda":
         await svuota_coda(update, context)
         return
         
-    # Se clicca sul bottone per rinominare
     if update.message.text == "🏷️ Rinomina i file":
         await chiedi_titolo(update, context)
         return
         
-    # Se l'utente non doveva inserire un titolo di testo, ignora il messaggio
     if not stato['waiting_for_title']:
         return
         
@@ -187,13 +187,11 @@ async def esegui_rinomina(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def main():
     application = Application.builder().token(TOKEN).build()
     
-    # Comandi di amministrazione
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("aggiungi", aggiungi_admin))
     application.add_handler(CommandHandler("rimuovi", rimuovi_admin))
     application.add_handler(CommandHandler("lista", mostra_lista))
     
-    # Gestione file e messaggi di testo/pulsanti
     application.add_handler(MessageHandler(filters.VIDEO | filters.Document.ALL, ricevi_file))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, esegui_rinomina))
     
